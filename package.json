@@ -1,0 +1,21 @@
+{
+  "name": "oc-tts-playback",
+  "version": "0.1.0",
+  "description": "A TTS playback module designed for OpenClaw-related projects.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "engines": {
+    "node": ">=24.16.0 <25"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^7.0.0"
+  }
+}
