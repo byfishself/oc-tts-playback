@@ -1,0 +1,20 @@
+{
+  "id": "tts-speaker",
+  "name": "TTS Speaker",
+  "version": "0.1.0",
+  "description": "Japanese text-to-speech provider",
+  "activation": {
+    "onStartup": true
+  },
+  "capabilityCatalogEntry": "./dist/openclaw/capability-catalog.js",
+  "contracts": {
+    "speechProviders": [
+      "tts-speaker"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}
