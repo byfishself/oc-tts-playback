@@ -1,17 +1,20 @@
+import { TTS_SETTINGS } from "../tts/settings.js";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { TtsSpeaker } from "../speaker.js";
 import { VoicevoxProvider } from "../tts/voicevox.js";
 
 const provider = new VoicevoxProvider({
-  speaker: 122,
+  speaker: TTS_SETTINGS.defaultSpeakerId,
+  fallbackSpeaker: TTS_SETTINGS.fallbackSpeakerId,
+  speedScale: TTS_SETTINGS.speedScale,
 });
 
 const speaker = new TtsSpeaker({
   provider,
 });
 
-// agent_end가 같은 run에 중복 호출되는 경우 중복 재생을 방지한다.
-// 메모리는 일정 시간 후 자동으로 정리한다.
+// Prevents duplicate playback if `agent_end` is called multiple times within the same run.
+// Memory is automatically freed after a certain amount of time.
 const processedRuns = new Set<string>();
 
 function markRunProcessed(runId?: string): boolean {
@@ -93,12 +96,12 @@ export default definePluginEntry({
     });
 
     api.on("agent_end", (event) => {
-      // 실패한 agent run은 읽지 않는다.
+      // Failed agent runs are not read.
       if (!event.success) {
         return;
       }
 
-      // 같은 run의 중복 agent_end 방지.
+      // Prevent duplicate `agent_end` events within the same run.
       if (!markRunProcessed(event.runId)) {
         return;
       }
@@ -109,8 +112,8 @@ export default definePluginEntry({
         return;
       }
 
-      // TTS가 OpenClaw agent lifecycle을 기다리게 하지 않는다.
-      // TtsSpeaker 내부 queue가 재생 순서를 보장한다.
+      // TTS does not cause the OpenClaw agent to wait.
+      // The internal queue in TtsSpeaker ensures the playback request.
       void speaker.speak(text).catch((error: unknown) => {
         const message =
           error instanceof Error ? error.message : String(error);
