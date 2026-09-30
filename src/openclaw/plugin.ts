@@ -1,40 +1,31 @@
-import { TTS_SETTINGS } from "../tts/settings.js";
+import type { OpenClawPluginApi } from "openclaw/plugin-sdk/plugin-entry";
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { TtsSpeaker } from "../speaker.js";
+import { resolveTtsSpeakerConfig } from "../tts/config.js";
 import { VoicevoxProvider } from "../tts/voicevox.js";
 
-const provider = new VoicevoxProvider({
-  speaker: TTS_SETTINGS.defaultSpeakerId,
-  fallbackSpeaker: TTS_SETTINGS.fallbackSpeakerId,
-  speedScale: TTS_SETTINGS.speedScale,
-});
+function markRunProcessedFactory() {
+  const processedRuns = new Set<string>();
 
-const speaker = new TtsSpeaker({
-  provider,
-});
+  return (runId?: string): boolean => {
+    if (!runId) {
+      return true;
+    }
 
-// Prevents duplicate playback if `agent_end` is called multiple times within the same run.
-// Memory is automatically freed after a certain amount of time.
-const processedRuns = new Set<string>();
+    if (processedRuns.has(runId)) {
+      return false;
+    }
 
-function markRunProcessed(runId?: string): boolean {
-  if (!runId) {
+    processedRuns.add(runId);
+
+    const timer = setTimeout(() => {
+      processedRuns.delete(runId);
+    }, 10 * 60 * 1000);
+
+    timer.unref?.();
+
     return true;
-  }
-
-  if (processedRuns.has(runId)) {
-    return false;
-  }
-
-  processedRuns.add(runId);
-
-  const timer = setTimeout(() => {
-    processedRuns.delete(runId);
-  }, 10 * 60 * 1000);
-
-  timer.unref?.();
-
-  return true;
+  };
 }
 
 function extractAssistantText(messages: unknown[]): string {
@@ -77,8 +68,22 @@ function extractAssistantText(messages: unknown[]): string {
 export default definePluginEntry({
   id: "tts-speaker",
   name: "TTS Speaker",
-  description: "Japanese text-to-speech provider",
-  register(api) {
+  description: "Local text-to-speech speaker playback",
+  register(api: OpenClawPluginApi) {
+    const config = resolveTtsSpeakerConfig(api.pluginConfig);
+
+    const provider = new VoicevoxProvider({
+      speaker: config.defaultSpeakerId,
+      fallbackSpeaker: config.fallbackSpeakerId,
+      speedScale: config.speedScale,
+    });
+
+    const speaker = new TtsSpeaker({
+      provider,
+    });
+
+    const markRunProcessed = markRunProcessedFactory();
+
     api.registerSpeechProvider({
       id: "tts-speaker",
       label: "TTS Speaker",
@@ -101,7 +106,7 @@ export default definePluginEntry({
         return;
       }
 
-      // Prevent duplicate `agent_end` events within the same run.
+      // Prevent duplicate playback for the same agent run.
       if (!markRunProcessed(event.runId)) {
         return;
       }
@@ -112,13 +117,13 @@ export default definePluginEntry({
         return;
       }
 
-      // TTS does not cause the OpenClaw agent to wait.
-      // The internal queue in TtsSpeaker ensures the playback request.
+      // Keep TTS playback outside the agent lifecycle.
+      // TtsSpeaker handles sequential playback through its internal queue.
       void speaker.speak(text).catch((error: unknown) => {
         const message =
           error instanceof Error ? error.message : String(error);
 
-        console.error("[TTS Speaker] playback failed:", message);
+        api.logger.error?.(`[TTS Speaker] playback failed: ${message}`);
       });
     });
   },

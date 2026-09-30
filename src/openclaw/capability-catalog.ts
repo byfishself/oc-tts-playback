@@ -1,10 +1,12 @@
-import { TTS_SETTINGS } from "../tts/settings.js";
+import {
+  DEFAULT_TTS_SPEAKER_CONFIG,
+} from "../tts/config.js";
 import { VoicevoxProvider } from "../tts/voicevox.js";
 
 const provider = new VoicevoxProvider({
-  speaker: TTS_SETTINGS.defaultSpeakerId,
-  fallbackSpeaker: TTS_SETTINGS.fallbackSpeakerId,
-  speedScale: TTS_SETTINGS.speedScale,
+  speaker: DEFAULT_TTS_SPEAKER_CONFIG.defaultSpeakerId,
+  fallbackSpeaker: DEFAULT_TTS_SPEAKER_CONFIG.fallbackSpeakerId,
+  speedScale: DEFAULT_TTS_SPEAKER_CONFIG.speedScale,
 });
 
 export default {

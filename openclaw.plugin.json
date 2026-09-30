@@ -2,7 +2,7 @@
   "id": "tts-speaker",
   "name": "TTS Speaker",
   "version": "0.1.0",
-  "description": "Japanese text-to-speech provider",
+  "description": "Local text-to-speech speaker playback",
   "activation": {
     "onStartup": true
   },
@@ -12,9 +12,82 @@
       "tts-speaker"
     ]
   },
+  "configGroups": [
+    {
+      "id": "voice",
+      "title": "Voice",
+      "order": 10,
+      "properties": [
+        "defaultSpeakerId",
+        "fallbackSpeakerId"
+      ]
+    },
+    {
+      "id": "emotion",
+      "title": "Emotion",
+      "order": 20,
+      "properties": [
+        "emotionSpeakerIds"
+      ]
+    },
+    {
+      "id": "playback",
+      "title": "Playback",
+      "order": 30,
+      "properties": [
+        "speedScale"
+      ]
+    }
+  ],
+  "uiHints": {
+    "defaultSpeakerId": {
+      "label": "Default Speaker ID",
+      "help": "VOICEVOX style ID used for normal speech."
+    },
+    "fallbackSpeakerId": {
+      "label": "Fallback Speaker ID",
+      "help": "VOICEVOX style ID used when the selected speaker fails."
+    },
+    "emotionSpeakerIds": {
+      "label": "Emotion Speaker IDs",
+      "help": "VOICEVOX style IDs available for emotional speech."
+    },
+    "speedScale": {
+      "label": "Speech Speed",
+      "help": "VOICEVOX speech speed multiplier."
+    }
+  },
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "properties": {}
+    "properties": {
+      "defaultSpeakerId": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 23
+      },
+      "fallbackSpeakerId": {
+        "type": "integer",
+        "minimum": 0,
+        "default": 3
+      },
+      "emotionSpeakerIds": {
+        "type": "array",
+        "items": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "default": [
+          24,
+          25,
+          26
+        ]
+      },
+      "speedScale": {
+        "type": "number",
+        "exclusiveMinimum": 0,
+        "default": 1.0
+      }
+    }
   }
 }
