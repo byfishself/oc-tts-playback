@@ -1,11 +1,27 @@
 import { VoicevoxProvider } from "./tts/voicevox.js";
+import type { TtsProvider } from "./tts/types.js";
 import { playWav } from "./playback/player.js";
 
-export class TtsSpeaker {
-  private readonly tts = new VoicevoxProvider(1);
+export interface TtsSpeakerOptions {
+  provider?: TtsProvider;
+}
 
-  async speak(text: string): Promise<void> {
-    const audio = await this.tts.synthesize(text);
-    await playWav(audio);
+export class TtsSpeaker {
+  private readonly tts: TtsProvider;
+  private queue: Promise<void> = Promise.resolve();
+
+  constructor(options: TtsSpeakerOptions = {}) {
+    this.tts = options.provider ?? new VoicevoxProvider();
+  }
+
+  speak(text: string): Promise<void> {
+    const task = this.queue.then(async () => {
+      const audio = await this.tts.synthesize(text);
+      await playWav(audio);
+    });
+
+    this.queue = task.catch(() => {});
+
+    return task;
   }
 }

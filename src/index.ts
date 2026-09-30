@@ -1,9 +1,22 @@
 import { TtsSpeaker } from "./speaker.js";
+import { VoicevoxProvider } from "./tts/voicevox.js";
 
 async function main(): Promise<void> {
-  const speaker = new TtsSpeaker();
+  const text = process.argv.slice(2).join(" ").trim();
 
-  await speaker.speak("こんにちは。これはTTS Speakerのテストです。");
+  if (!text) {
+    console.error("Usage: npm start -- <text>");
+    process.exitCode = 1;
+    return;
+  }
+
+  const speaker = new TtsSpeaker({
+    provider: new VoicevoxProvider({
+      speaker: 1,
+    }),
+  });
+
+  await speaker.speak(text);
 }
 
 main().catch((error) => {
