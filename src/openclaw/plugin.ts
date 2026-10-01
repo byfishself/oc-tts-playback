@@ -288,7 +288,8 @@ export default definePluginEntry({
               `[TTS Speaker] stream marker instance=${instanceId}` +
               ` run=${runId}` +
               ` has=${streamedRunIds.has(runId)}` +
-              ` size=${streamedRunIds.size}`,
+              ` size=${streamedRunIds.size}`+
+              ` runState=${streamingRuns.has(runId)}`,
           )
         }
             
@@ -417,7 +418,8 @@ drainCompleteSentences(run, enqueueShared);
           `[TTS Speaker] agent_end instance=${instanceId}` +
           ` run=${runId}` +
           ` hadStreaming=${hadStreaming}` +
-          ` setSize=${streamedRunIds.size}`,
+          ` setSize=${streamedRunIds.size}`+
+           ` runState=${streamingRuns.has(runId ?? "")}`,
         );
       
       if (streamRun?.received) {
