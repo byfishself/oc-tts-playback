@@ -195,7 +195,10 @@ export default definePluginEntry({
   name: "TTS Speaker",
   description: "Local text-to-speech speaker playback",
 
+  
   register(api) {
+    const instanceId = Math.random().toString(36).slice(2, 8);
+    console.log(`[TTS Speaker] register instance=${instanceId}`);
     const config = resolveTtsSpeakerConfig(
       api.pluginConfig ?? DEFAULT_TTS_SPEAKER_CONFIG,
     );
@@ -211,6 +214,7 @@ export default definePluginEntry({
 
     const speaker = new TtsSpeaker({ provider });
     const streamingRuns = new Map<string, StreamingRun>();
+    const streamedRunIds = new Set<string>();
 
     const selectedSpeakersByRun = new Map<string, number>();
     const pendingRuns = new Map<
@@ -261,8 +265,19 @@ export default definePluginEntry({
         const runId = event.runId;
         if (!runId) return;
 
+
+
         const text = typeof event.data.text === "string" ? event.data.text : "";
         const delta = typeof event.data.delta === "string" ? event.data.delta : "";
+        if (text || delta) {
+          streamedRunIds.add(runId);
+          console.log(
+              `[TTS Speaker] stream marker instance=${instanceId}` +
+              ` run=${runId}` +
+              ` has=${streamedRunIds.has(runId)}` +
+              ` size=${streamedRunIds.size}`,
+          )
+        }
             
         console.log(
             `[TTS Speaker] assistant run=${event.runId}` +
@@ -381,10 +396,19 @@ drainCompleteSentences(run, enqueueSentence);
     });
 
     api.on("agent_end", (event) => {
-      console.log(`[TTS Speaker] agent_end run=${event.runId}`);
       const runId = event.runId;
       const streamRun = runId ? streamingRuns.get(runId) : undefined;
+      const hadStreaming = runId ? streamedRunIds.has(runId) : false;
 
+      console.log(
+        `[TTS Speaker] agent_end instance=${instanceId}` +
+        `[TTS Speaker] agent_end run=${runId}` +
+        ` hadStreaming=${hadStreaming}` +
+        ` streamReceived=${streamRun?.received}` +
+        ` setSize=${streamedRunIds.size}`+
+        ` streamBuffer=${JSON.stringify(streamRun?.buffer)}`,
+        );
+      
       if (streamRun?.received) {
         // Streaming already queued complete sentences. Only flush the
         // final incomplete sentence here; never replay the full response.
