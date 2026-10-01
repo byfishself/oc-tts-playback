@@ -23,18 +23,44 @@ interface StreamingRun {
 const VOICE_SELECTION_WAIT_MS = 750;
 const VOICE_SELECTION_SETTLE_MS = 75;
 
-const streamingRuns = new Map<string, StreamingRun>();
-const streamedRunIds = new Set<string>();
-const selectedSpeakersByRun = new Map<string, number>();
+interface SharedTtsState {
+  streamingRuns: Map<string, StreamingRun>;
+  streamedRunIds: Set<string>;
+  selectedSpeakersByRun: Map<string, number>;
+  pendingRuns: Map<
+    string,
+    { text: string; timer: ReturnType<typeof setTimeout> }
+  >;
+  enqueueSentence?:
+    | ((text: string, speakerId: number) => void)
+    | undefined;
+}
 
-const pendingRuns = new Map<
-  string,
-  { text: string; timer: ReturnType<typeof setTimeout> }
->();
+const globalStateKey = Symbol.for("tts-speaker.shared-state");
 
-let sharedEnqueueSentence:
-  | ((text: string, speakerId: number) => void)
-  | undefined;
+const globalState = globalThis as typeof globalThis & {
+  [globalStateKey]?: SharedTtsState;
+};
+
+const state =
+  globalState[globalStateKey] ??
+  (globalState[globalStateKey] = {
+    streamingRuns: new Map(),
+    streamedRunIds: new Set(),
+    selectedSpeakersByRun: new Map(),
+    pendingRuns: new Map<
+    string,
+    { text: string; timer: ReturnType<typeof setTimeout> }
+    >(),
+    enqueueSentence: undefined,
+  });
+
+const {
+  streamingRuns,
+  streamedRunIds,
+  selectedSpeakersByRun,
+  pendingRuns,
+} = state;
 
 function mergeVoices(
   builtinVoices: TtsVoiceDefinition[],
@@ -246,10 +272,10 @@ export default definePluginEntry({
         );
       });
     };
-    sharedEnqueueSentence = enqueueSentence;
+    state.enqueueSentence = enqueueSentence;
 
     const enqueueShared = (text: string, speakerId: number) => {
-      const enqueue = sharedEnqueueSentence;
+      const enqueue = state.enqueueSentence;
     if (enqueue) {
       enqueue(text, speakerId);
       }
@@ -431,6 +457,8 @@ drainCompleteSentences(run, enqueueShared);
 
         streamingRuns.delete(runId!);
         selectedSpeakersByRun.delete(runId!);
+        streamedRunIds.delete(runId!);
+
         const pending = pendingRuns.get(runId!);
         if (pending) {
           clearTimeout(pending.timer);
