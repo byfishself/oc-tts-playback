@@ -2,6 +2,7 @@ import type { TtsProvider } from "./types.js";
 
 const VOICEVOX_URL = "http://127.0.0.1:50021";
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_SPEED_SCALE = 1.0;
 
 export interface VoicevoxOptions {
   speaker?: number;
@@ -23,7 +24,7 @@ export class VoicevoxProvider implements TtsProvider {
     this.fallbackSpeaker = options.fallbackSpeaker;
     this.baseUrl = options.baseUrl ?? VOICEVOX_URL;
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-    this.speedScale = options.speedScale ?? 1.0;
+    this.speedScale = options.speedScale ?? DEFAULT_SPEED_SCALE;
 
     if (!Number.isFinite(this.timeoutMs) || this.timeoutMs <= 0) {
       throw new Error("VOICEVOX timeoutMs must be a positive number.");
@@ -35,10 +36,17 @@ export class VoicevoxProvider implements TtsProvider {
   }
 
   async synthesize(text: string): Promise<Buffer> {
-    return this.synthesizeWithSpeaker(text, this.speaker);
+    return this.synthesizeWithFallback(text, this.speaker);
   }
 
   async synthesizeWithSpeaker(
+    text: string,
+    speakerId: number,
+  ): Promise<Buffer> {
+    return this.synthesizeWithFallback(text, speakerId);
+  }
+
+  private async synthesizeWithFallback(
     text: string,
     speakerId: number,
   ): Promise<Buffer> {
@@ -49,21 +57,51 @@ export class VoicevoxProvider implements TtsProvider {
     }
 
     try {
-      return await this.synthesizeUsingSpeaker(cleanText, speakerId);
-    } catch (error: unknown) {
-      if (
-        this.fallbackSpeaker === undefined ||
-        speakerId === this.fallbackSpeaker
-      ) {
-        throw error;
+      // Try the requested speaker first.
+      return await this.synthesizeUsingSpeaker(
+        cleanText,
+        speakerId,
+      );
+    } catch (primaryError: unknown) {
+      // Emotion or special voice failed: fall back to the configured normal voice.
+      if (speakerId !== this.speaker) {
+        try {
+          console.error(
+            `[TTS Speaker] speaker ${speakerId} failed, falling back to default speaker ${this.speaker}.`,
+            primaryError,
+          );
+
+          return await this.synthesizeUsingSpeaker(
+            cleanText,
+            this.speaker,
+          );
+        } catch (defaultError: unknown) {
+          // Continue to the emergency fallback below.
+          console.error(
+            `[TTS Speaker] default speaker ${this.speaker} also failed.`,
+            defaultError,
+          );
+        }
       }
 
-      console.error(
-        `[TTS Speaker] speaker ${speakerId} failed, falling back to ${this.fallbackSpeaker}.`,
-        error,
-      );
+      // The normal voice failed, so use the final fallback speaker.
+      if (
+        this.fallbackSpeaker !== undefined &&
+        this.fallbackSpeaker !== this.speaker &&
+        this.fallbackSpeaker !== speakerId
+      ) {
+        console.error(
+          `[TTS Speaker] falling back to emergency speaker ${this.fallbackSpeaker}.`,
+        );
 
-      return this.synthesizeUsingSpeaker(cleanText, this.fallbackSpeaker);
+        return this.synthesizeUsingSpeaker(
+          cleanText,
+          this.fallbackSpeaker,
+        );
+      }
+
+      // No fallback is available.
+      throw primaryError;
     }
   }
 
@@ -86,6 +124,8 @@ export class VoicevoxProvider implements TtsProvider {
     }
 
     const query = (await queryResponse.json()) as Record<string, unknown>;
+
+    // Apply the configured speech speed to the generated query.
     query.speedScale = this.speedScale;
 
     const synthesisUrl = new URL("/synthesis", this.baseUrl);
