@@ -94,6 +94,9 @@ Replace the example ID and details with a style that exists in your VOICEVOX Eng
 
 ## Voice selection
 
+For the built-in style IDs and instructions for listing every style available in your local Engine, see [VOICEVOX Speakers and Style IDs](VOICEVOX_SPEAKERS.md).
+
+
 The extension recognizes this directive in assistant output:
 
 ```text
