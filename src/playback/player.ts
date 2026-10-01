@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 export async function playWav(audio: Buffer): Promise<void> {
   const filePath = path.join(
     os.tmpdir(),
-    `oc-tts-playback-${randomUUID()}.wav`,
+    `oc-tts-speaker-${randomUUID()}.wav`,
   );
 
   await fs.writeFile(filePath, audio);
