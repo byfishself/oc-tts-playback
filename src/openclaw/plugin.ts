@@ -219,6 +219,9 @@ export default definePluginEntry({
     >();
 
     const enqueueSentence = (text: string, speakerId: number) => {
+        console.log(
+          `[TTS Speaker] enqueue speaker=${speakerId} text=${JSON.stringify(text)}`,
+        );
       const speech = extractSpeech(
         text,
         config.defaultSpeakerId,
@@ -254,12 +257,18 @@ export default definePluginEntry({
       description: "Stream assistant text into the local TTS sentence queue",
       streams: ["assistant"],
       handle: (event) => {
+  if (event.stream !== "assistant") return;
         const runId = event.runId;
         if (!runId) return;
 
         const text = typeof event.data.text === "string" ? event.data.text : "";
         const delta = typeof event.data.delta === "string" ? event.data.delta : "";
-
+            
+        console.log(
+            `[TTS Speaker] assistant run=${event.runId}` +
+            `text=${JSON.stringify(text)}` +
+            `delta=${JSON.stringify(delta)}`,
+          );
         if (!text && !delta) return;
 
         let run = streamingRuns.get(runId);
@@ -291,6 +300,10 @@ export default definePluginEntry({
 
         const selected = extractSpeakerDirective(run.buffer, allowedSpeakerIds);
         if (selected !== undefined) {
+          console.log(
+            `[TTS Speaker] speaker directive run=${runId} selected=${selected}`,
+          );
+
           run.speakerId = selected;
           selectedSpeakersByRun.set(runId, selected);
         }
@@ -364,6 +377,7 @@ export default definePluginEntry({
     });
 
     api.on("agent_end", (event) => {
+      console.log(`[TTS Speaker] agent_end run=${event.runId}`);
       const runId = event.runId;
       const streamRun = runId ? streamingRuns.get(runId) : undefined;
 
