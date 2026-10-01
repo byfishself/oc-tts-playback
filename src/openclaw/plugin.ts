@@ -342,14 +342,14 @@ export default definePluginEntry({
           voices,
           run.speakerId,
         );
-run.speakerId = cleaned.speakerId;
-run.buffer = cleaned.text;
+        run.speakerId = cleaned.speakerId;
+        run.buffer = cleaned.text;
 
 console.log(
   `[TTS Speaker] drain buffer=${JSON.stringify(run.buffer)}`,
 );
 
-drainCompleteSentences(run, enqueueSentence);
+drainCompleteSentences(run, enqueueShared);
       },
     });
 
@@ -384,7 +384,7 @@ drainCompleteSentences(run, enqueueSentence);
                 voices,
                 directiveSpeakerId,
               );
-              if (speech.text) enqueueSentence(speech.text, speech.speakerId);
+              if (speech.text) enqueueShared(speech.text, speech.speakerId);
             }, VOICE_SELECTION_SETTLE_MS);
           }
         }
@@ -424,7 +424,7 @@ drainCompleteSentences(run, enqueueSentence);
         // Streaming already queued complete sentences. Only flush the
         // final incomplete sentence here; never replay the full response.
         if (streamRun.buffer.trim()) {
-          enqueueSentence(streamRun.buffer, streamRun.speakerId);
+          enqueueShared(streamRun.buffer, streamRun.speakerId);
         }
 
         streamingRuns.delete(runId!);
@@ -457,7 +457,7 @@ drainCompleteSentences(run, enqueueSentence);
         if (runId) selectedSpeakersByRun.delete(runId);
 
         if (speech.text) {
-          enqueueSentence(speech.text, speech.speakerId);
+          enqueueShared(speech.text, speech.speakerId);
         }
       };
 
