@@ -1,4 +1,4 @@
-# TTS Speaker (`oc-tts-playback`)
+# TTS Speaker (`oc-tts-speaker`)
 
 English | [日本語](README.ja.md)
 
@@ -16,6 +16,31 @@ English | [日本語](README.ja.md)
 
 TTS Speaker uses its own playback flow. Disable OpenClaw's built-in automatic TTS if you do not want the same response to be spoken twice.
 
+## Streaming TTS
+
+TTS Speaker can receive assistant text from the OpenClaw Gateway while an agent response is still being generated. When streaming text contains a completed sentence, that sentence is sent to the local TTS playback queue immediately instead of waiting for the entire response to finish.
+
+The streaming flow works as follows:
+
+1. The assistant's streamed text is accumulated per agent run.
+2. Completed sentences are detected using Japanese and common sentence-ending punctuation (`。`, `！`, `？`, `!`, `?`).
+3. Each completed sentence is synthesized and added to the sequential playback queue.
+4. Additional sentences are played in order as they become available.
+5. When the agent run ends, any remaining text in the stream buffer is queued.
+6. If no streaming text was received for the run, the normal `agent_end` fallback plays the completed assistant response instead.
+
+This prevents a streamed response from being spoken a second time by the completion fallback.
+
+The streaming state is shared across TTS Speaker plugin registration instances so that the streaming handler and the `agent_end` fallback can correctly recognize the same OpenClaw agent run.
+
+### Playback characteristics
+
+- **Sentence-by-sentence:** completed sentences can begin playback before the model finishes generating the full response.
+- **Sequential:** sentences are queued and played one at a time; they do not overlap.
+- **Buffered remainder:** text without a completed sentence terminator remains buffered until the agent run ends.
+- **Fallback:** non-streaming or otherwise unobserved runs still use the normal completed-response playback path.
+- **Japanese-oriented:** sentence splitting is designed around Japanese punctuation while also accepting common `!`/`?` terminators.
+
 ## Requirements
 
 - OpenClaw
@@ -28,8 +53,8 @@ TTS Speaker uses its own playback flow. Disable OpenClaw's built-in automatic TT
 Clone the repository and build the TypeScript source:
 
 ```powershell
-git clone https://github.com/byfishself/oc-tts-playback.git
-cd oc-tts-playback
+git clone https://github.com/byfishself/oc-tts-speaker.git
+cd oc-tts-speaker
 npm ci
 npm run build
 ```
@@ -107,10 +132,12 @@ The numeric value is a VOICEVOX **style ID** (`styles[].id`), not a character ID
 
 ## Playback behavior and current scope
 
-- Assistant output is handled after the OpenClaw agent turn completes.
+- Assistant text can be received from the OpenClaw Gateway while the agent is still generating a response.
+- Completed sentences are synthesized and played as soon as they are available.
 - Audio is synthesized by VOICEVOX Engine and played locally.
-- Playback requests are queued sequentially, and multi-sentence responses are split for sequential playback.
-- **Real-time sentence-by-sentence playback while the model is still generating a response is not implemented yet.**
+- Playback requests are queued sequentially, and sentences do not overlap.
+- If streaming text is not observed for an agent run, the completed assistant response is handled through the `agent_end` fallback.
+- A streamed run is not replayed in full by the fallback path after its streamed sentences have already been queued.
 
 ## Development
 
