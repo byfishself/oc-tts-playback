@@ -1,4 +1,4 @@
-# TTS Speaker (`oc-tts-playback`)
+# TTS Speaker (`oc-tts-speaker`)
 
 English | [日本語](README.ja.md)
 
@@ -53,8 +53,8 @@ The streaming state is shared across TTS Speaker plugin registration instances s
 Clone the repository and build the TypeScript source:
 
 ```powershell
-git clone https://github.com/byfishself/oc-tts-playback.git
-cd oc-tts-playback
+git clone https://github.com/byfishself/oc-tts-speaker.git
+cd oc-tts-speaker
 npm ci
 npm run build
 ```
