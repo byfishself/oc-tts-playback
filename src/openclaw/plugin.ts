@@ -174,7 +174,7 @@ function drainCompleteSentences(
   run: StreamingRun,
   enqueue: (text: string, speakerId: number) => void,
 ): void {
-  const sentencePattern = /[\\s\\S]*?[。！？!?](?:[\\s]*)/gu;
+  const sentencePattern = /[\s\S]*?[。！？!?]\s*/gu;
   let consumed = 0;
 
   for (const match of run.buffer.matchAll(sentencePattern)) {
