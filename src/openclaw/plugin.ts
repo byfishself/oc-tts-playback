@@ -23,6 +23,19 @@ interface StreamingRun {
 const VOICE_SELECTION_WAIT_MS = 750;
 const VOICE_SELECTION_SETTLE_MS = 75;
 
+const streamingRuns = new Map<string, StreamingRun>();
+const streamedRunIds = new Set<string>();
+const selectedSpeakersByRun = new Map<string, number>();
+
+const pendingRuns = new Map<
+  string,
+  { text: string; timer: ReturnType<typeof setTimeout> }
+>();
+
+let sharedEnqueueSentence:
+  | ((text: string, speakerId: number) => void)
+  | undefined;
+
 function mergeVoices(
   builtinVoices: TtsVoiceDefinition[],
   additionalVoices: TtsVoiceDefinition[],
@@ -213,14 +226,6 @@ export default definePluginEntry({
     });
 
     const speaker = new TtsSpeaker({ provider });
-    const streamingRuns = new Map<string, StreamingRun>();
-    const streamedRunIds = new Set<string>();
-
-    const selectedSpeakersByRun = new Map<string, number>();
-    const pendingRuns = new Map<
-      string,
-      { text: string; timer: ReturnType<typeof setTimeout> }
-    >();
 
     const enqueueSentence = (text: string, speakerId: number) => {
         console.log(
@@ -240,6 +245,14 @@ export default definePluginEntry({
           `[TTS Speaker] playback failed: ${error instanceof Error ? error.message : String(error)}`,
         );
       });
+    };
+    sharedEnqueueSentence = enqueueSentence;
+
+    const enqueueShared = (text: string, speakerId: number) => {
+      const enqueue = sharedEnqueueSentence;
+    if (enqueue) {
+      enqueue(text, speakerId);
+      }
     };
 
     api.on("before_prompt_build", () => ({
@@ -401,12 +414,10 @@ drainCompleteSentences(run, enqueueSentence);
       const hadStreaming = runId ? streamedRunIds.has(runId) : false;
 
       console.log(
-        `[TTS Speaker] agent_end instance=${instanceId}` +
-        `[TTS Speaker] agent_end run=${runId}` +
-        ` hadStreaming=${hadStreaming}` +
-        ` streamReceived=${streamRun?.received}` +
-        ` setSize=${streamedRunIds.size}`+
-        ` streamBuffer=${JSON.stringify(streamRun?.buffer)}`,
+          `[TTS Speaker] agent_end instance=${instanceId}` +
+          ` run=${runId}` +
+          ` hadStreaming=${hadStreaming}` +
+          ` setSize=${streamedRunIds.size}`,
         );
       
       if (streamRun?.received) {
