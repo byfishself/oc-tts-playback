@@ -317,7 +317,27 @@ export default definePluginEntry({
         run.speakerId = cleaned.speakerId;
         run.buffer = cleaned.text;
 
-        drainCompleteSentences(run, enqueueSentence);
+
+
+  let consumed = 0;
+
+  for (const match of run.buffer.matchAll(sentencePattern)) {
+    const sentence = match[0].trim();
+
+    console.log(
+      `[TTS Speaker] drain match=${JSON.stringify(sentence)}`,
+    );
+
+    if (!sentence) continue;
+
+    enqueue(sentence, run.speakerId);
+    consumed = (match.index ?? 0) + match[0].length;
+  }
+
+  if (consumed > 0) {
+    run.buffer = run.buffer.slice(consumed);
+  }
+}
       },
     });
 
