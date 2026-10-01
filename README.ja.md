@@ -1,4 +1,4 @@
-# TTS Speaker (`oc-tts-playback`)
+# TTS Speaker (`oc-tts-speaker`)
 
 [English](README.md) | 日本語
 
@@ -28,8 +28,8 @@ TTS Speaker は独自の再生処理を使用します。同じ応答が二重�
 リポジトリを clone し、TypeScript をビルドします。
 
 ```powershell
-git clone https://github.com/byfishself/oc-tts-playback.git
-cd oc-tts-playback
+git clone https://github.com/byfishself/oc-tts-speaker.git
+cd oc-tts-speaker
 npm ci
 npm run build
 ```
