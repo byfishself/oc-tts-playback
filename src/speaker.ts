@@ -9,6 +9,7 @@ export interface SpeakerAwareTtsProvider extends TtsProvider {
 export interface TtsSpeakerOptions {
   provider?: TtsProvider;
 }
+
 function splitJapaneseSentences(text: string): string[] {
   const sentences = text
     .trim()
@@ -16,7 +17,6 @@ function splitJapaneseSentences(text: string): string[] {
     .map((sentence) => sentence.trim())
     .filter(Boolean);
 
-  // Keep trailing emoji or closing punctuation with the previous sentence.
   if (sentences.length > 1) {
     const last = sentences[sentences.length - 1];
 
@@ -28,6 +28,7 @@ function splitJapaneseSentences(text: string): string[] {
 
   return sentences;
 }
+
 export class TtsSpeaker {
   private readonly tts: TtsProvider;
   private queue: Promise<void> = Promise.resolve();
@@ -36,54 +37,48 @@ export class TtsSpeaker {
     this.tts = options.provider ?? new VoicevoxProvider();
   }
 
-speak(text: string, speakerId?: number): Promise<void> {
-  const sentences = splitJapaneseSentences(text);
-
-  if (sentences.length === 0) {
-    return Promise.resolve();
+  speak(text: string, speakerId?: number): Promise<void> {
+    return this.enqueueText(text, speakerId);
   }
 
-  const task = this.queue.then(async () => {
-    // Synthesize the first sentence before starting playback.
-    let currentAudio = await this.synthesize(
-      sentences[0]!,
-      speakerId,
-    );
+  enqueueText(text: string, speakerId?: number): Promise<void> {
+    const sentences = splitJapaneseSentences(text);
 
-    for (let i = 0; i < sentences.length; i++) {
-      // Synthesize the next sentence while the current one plays.
-      const nextAudioPromise =
-        i + 1 < sentences.length
-          ? this.synthesize(sentences[i + 1]!, speakerId).then(
-              (audio) => ({ ok: true as const, audio }),
-              (error: unknown) => ({ ok: false as const, error }),
-            )
-          : undefined;
-
-      await playWav(currentAudio);
-
-      if (nextAudioPromise) {
-        const result = await nextAudioPromise;
-
-        if (!result.ok) {
-          throw result.error;
-        }
-
-        currentAudio = result.audio;
-      }
+    if (sentences.length === 0) {
+      return Promise.resolve();
     }
-  });
 
-  // Keep the queue alive even when one playback task fails.
-  this.queue = task.catch(() => {});
+    const task = this.queue.then(async () => {
+      let currentAudio = await this.synthesize(sentences[0]!, speakerId);
 
-  return task;
-}
+      for (let i = 0; i < sentences.length; i++) {
+        const nextAudioPromise =
+          i + 1 < sentences.length
+            ? this.synthesize(sentences[i + 1]!, speakerId).then(
+                (audio) => ({ ok: true as const, audio }),
+                (error: unknown) => ({ ok: false as const, error }),
+              )
+            : undefined;
 
-  private async synthesize(
-    text: string,
-    speakerId?: number,
-  ): Promise<Buffer> {
+        await playWav(currentAudio);
+
+        if (nextAudioPromise) {
+          const result = await nextAudioPromise;
+
+          if (!result.ok) {
+            throw result.error;
+          }
+
+          currentAudio = result.audio;
+        }
+      }
+    });
+
+    this.queue = task.catch(() => {});
+    return task;
+  }
+
+  private async synthesize(text: string, speakerId?: number): Promise<Buffer> {
     if (
       speakerId !== undefined &&
       this.isSpeakerAwareProvider(this.tts)
