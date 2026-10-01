@@ -314,30 +314,14 @@ export default definePluginEntry({
           voices,
           run.speakerId,
         );
-        run.speakerId = cleaned.speakerId;
-        run.buffer = cleaned.text;
+run.speakerId = cleaned.speakerId;
+run.buffer = cleaned.text;
 
+console.log(
+  `[TTS Speaker] drain buffer=${JSON.stringify(run.buffer)}`,
+);
 
-
-  let consumed = 0;
-
-  for (const match of run.buffer.matchAll(sentencePattern)) {
-    const sentence = match[0].trim();
-
-    console.log(
-      `[TTS Speaker] drain match=${JSON.stringify(sentence)}`,
-    );
-
-    if (!sentence) continue;
-
-    enqueue(sentence, run.speakerId);
-    consumed = (match.index ?? 0) + match[0].length;
-  }
-
-  if (consumed > 0) {
-    run.buffer = run.buffer.slice(consumed);
-  }
-}
+drainCompleteSentences(run, enqueueSentence);
       },
     });
 
