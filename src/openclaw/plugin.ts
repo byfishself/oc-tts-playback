@@ -209,23 +209,70 @@ function buildVoiceInstructions(
   return lines.join("\n");
 }
 
+
 function drainCompleteSentences(
   run: StreamingRun,
+  allowedSpeakerIds: Set<number>,
   enqueue: (text: string, speakerId: number) => void,
 ): void {
   const sentencePattern = /[\s\S]*?[。！？!?]\s*/gu;
-  let consumed = 0;
 
-  for (const match of run.buffer.matchAll(sentencePattern)) {
-    const sentence = match[0].trim();
-    if (!sentence) continue;
+  const enqueueText = (text: string, speakerId: number) => {
+    let consumed = 0;
 
-    enqueue(sentence, run.speakerId);
-    consumed = (match.index ?? 0) + match[0].length;
-  }
+    for (const match of text.matchAll(sentencePattern)) {
+      const sentence = match[0].trim();
+      if (sentence) enqueue(sentence, speakerId);
+      consumed = (match.index ?? 0) + match[0].length;
+    }
 
-  if (consumed > 0) {
-    run.buffer = run.buffer.slice(consumed);
+    return text.slice(consumed);
+  };
+
+  while (run.buffer) {
+    const directiveMatch = /\[\[tts:([^\]]*)\]\]/i.exec(run.buffer);
+
+    if (directiveMatch) {
+      const directiveIndex = directiveMatch.index;
+      const beforeDirective = run.buffer.slice(0, directiveIndex);
+
+      // The remaining sentences before the speaker are also played back by the previous speaker.
+      const remainder = enqueueText(beforeDirective, run.speakerId);
+      if (remainder.trim()) {
+        enqueue(remainder.trim(), run.speakerId);
+      }
+
+      const speakerMatch = directiveMatch[1].match(
+        /(?:^|\s)speakerVoiceId\s*=\s*(\d+)(?=\s|$)/i,
+      );
+
+      if (speakerMatch) {
+        const speakerId = Number(speakerMatch[1]);
+
+        if (allowedSpeakerIds.has(speakerId)) {
+          run.speakerId = speakerId;
+        }
+      }
+
+      run.buffer = run.buffer.slice(
+        directiveIndex + directiveMatch[0].length,
+      );
+      continue;
+    }
+
+    // If a streaming chunk ends in the middle of a pointer, it is held until the next chunk.
+    const partialDirective = /\[\[tts:[^\]]*$/i.exec(run.buffer);
+    if (partialDirective) {
+      const beforePartial = run.buffer.slice(0, partialDirective.index);
+      const remainder = enqueueText(beforePartial, run.speakerId);
+
+      run.buffer =
+        remainder + run.buffer.slice(partialDirective.index);
+      return;
+    }
+
+    run.buffer = enqueueText(run.buffer, run.speakerId);
+    return;
   }
 }
 
@@ -280,6 +327,38 @@ export default definePluginEntry({
       enqueue(text, speakerId);
       }
     };
+    
+    api.on("after_tool_call", (event) => {
+      console.log(
+        `[TTS Speaker] after_tool_call` +
+          ` tool=${event.toolName}` +
+          ` run=${event.runId ?? "unknown"}` +
+          ` action=${String(event.params.action)}`,
+      );
+
+      if (event.toolName !== "message") return;
+      if (event.error) return;
+
+      const params = event.params;
+      if (params.action !== "send") return;
+      if (typeof params.message !== "string") return;
+
+      const speech = extractSpeech(
+        params.message,
+        config.defaultSpeakerId,
+        voices,
+      );
+
+      if (!speech.text.trim()) return;
+
+      console.log(
+        `[TTS Speaker] message tool` +
+          ` speaker=${speech.speakerId}` +
+          ` text=${speech.text}`,
+      );
+
+      enqueueShared(speech.text, speech.speakerId);
+    });
 
     api.on("before_prompt_build", () => ({
       appendSystemContext: buildVoiceInstructions(
@@ -308,6 +387,12 @@ export default definePluginEntry({
 
         const text = typeof event.data.text === "string" ? event.data.text : "";
         const delta = typeof event.data.delta === "string" ? event.data.delta : "";
+        console.log(
+          `[TTS Speaker] stream event` +
+          ` run=${event.runId ?? "unknown"}` +
+          ` text=${JSON.stringify(event.data.text ?? "")}` +
+          ` delta=${JSON.stringify(event.data.delta ?? "")}`,
+          );
         if (text || delta) {
           streamedRunIds.add(runId);
           console.log(
@@ -353,30 +438,17 @@ export default definePluginEntry({
         run.received = true;
         run.buffer += appended;
 
-        const selected = extractSpeakerDirective(run.buffer, allowedSpeakerIds);
-        if (selected !== undefined) {
-          console.log(
-            `[TTS Speaker] speaker directive run=${runId} selected=${selected}`,
-          );
 
-          run.speakerId = selected;
-          selectedSpeakersByRun.set(runId, selected);
-        }
-
-        const cleaned = extractSpeech(
-          run.buffer,
-          config.defaultSpeakerId,
-          voices,
-          run.speakerId,
+        
+        console.log(
+          `[TTS Speaker] drain buffer=${JSON.stringify(run.buffer)}`,
         );
-        run.speakerId = cleaned.speakerId;
-        run.buffer = cleaned.text;
 
-console.log(
-  `[TTS Speaker] drain buffer=${JSON.stringify(run.buffer)}`,
-);
-
-drainCompleteSentences(run, enqueueShared);
+        drainCompleteSentences(
+          run,
+          allowedSpeakerIds,
+          enqueueShared,
+        );
       },
     });
 
