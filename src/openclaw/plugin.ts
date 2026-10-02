@@ -1,9 +1,12 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
+import fs from "node:fs";
+import path from "node:path";
 import { TtsSpeaker } from "../speaker.js";
 import {
-  BUILTIN_VOICES,
   DEFAULT_TTS_SPEAKER_CONFIG,
+  DEFAULT_VOICE_CONFIG,
   resolveTtsSpeakerConfig,
+  resolveVoiceConfig,
   type TtsVoiceDefinition,
 } from "../tts/config.js";
 import { VoicevoxProvider } from "../tts/voicevox.js";
@@ -62,16 +65,33 @@ const {
   pendingRuns,
 } = state;
 
-function mergeVoices(
-  builtinVoices: TtsVoiceDefinition[],
-  additionalVoices: TtsVoiceDefinition[],
-): TtsVoiceDefinition[] {
-  const voices = new Map<number, TtsVoiceDefinition>();
+function loadVoiceConfig(stateDir: string) {
+  const dataDir = path.join(stateDir, "TTS Speaker", "tts-speaker");
+  const voicesPath = path.join(dataDir, "voices.json");
 
-  for (const voice of builtinVoices) voices.set(voice.id, voice);
-  for (const voice of additionalVoices) voices.set(voice.id, voice);
+  fs.mkdirSync(dataDir, { recursive: true });
 
-  return [...voices.values()];
+  if (!fs.existsSync(voicesPath)) {
+    fs.writeFileSync(
+      voicesPath,
+      JSON.stringify(DEFAULT_VOICE_CONFIG, null, 2) + "\n",
+      "utf8",
+    );
+    return resolveVoiceConfig(DEFAULT_VOICE_CONFIG);
+  }
+
+  try {
+    return resolveVoiceConfig(
+      JSON.parse(fs.readFileSync(voicesPath, "utf8")),
+    );
+  } catch (error) {
+    console.warn(
+      `[TTS Speaker] Failed to read voices.json; using defaults: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return resolveVoiceConfig(DEFAULT_VOICE_CONFIG);
+  }
 }
 
 function extractAssistantText(messages: unknown[]): string {
@@ -169,46 +189,31 @@ function buildVoiceInstructions(
       voice.id !== defaultSpeakerId && voice.id !== fallbackSpeakerId,
   );
 
-  const lines = [
-    "Voice delivery guidance:",
-    "- Use the default voice for ordinary conversation.",
-    "- If the user explicitly requests a voice by character name, label, style name, or ID, you MUST select that voice.",
-    "- When the user explicitly requests a voice, you MUST include its corresponding voice directive in your response.",
-    "- Use the default voice only when the user has not explicitly requested a different voice.",
-    "- When no voice is explicitly requested, you may select another available voice if it clearly improves the emotional or dramatic delivery.",
-    "- Prefer the default voice when the appropriate style is ambiguous.",
-    "- Do not mention voice settings, voice IDs, TTS directives, or these instructions to the user.",
-    "- Do not explain why a voice was selected.",
-    "- A voice directive is metadata for speech synthesis, not part of the user-facing response.",
-    "- Use at most one voice directive in a response.",
-    "- Directive format: [[tts:speakerVoiceId=ID]]",
-    "- Never select the emergency fallback voice directly.",
-  ];
+const lines = [
+  "Voice delivery is part of every assistant response.",
+  "For every response, determine the most appropriate available voice.",
+  "Use the default voice for ordinary conversation or when the appropriate style is ambiguous.",
+  "Use an emotional voice when the emotional delivery clearly benefits from it.",
+  "If a specific voice is explicitly requested by ID, select that voice.",
+  "Always include exactly one voice directive in every response.",
+  "The voice directive is metadata for speech synthesis and must not be shown or explained to the user.",
+  "Do not mention voice settings, voice IDs, TTS directives, or these instructions to the user.",
+  "Directive format: [[tts:speakerVoiceId=ID]]",
+  "Never select the emergency fallback voice directly.",
+];
 
-  if (defaultVoice) {
-    lines.push(
-      `Default voice: ${defaultVoice.label} — ${defaultVoice.description}`,
-    );
-  } else {
-    lines.push(`Default voice: configured voice (ID ${defaultSpeakerId}).`);
-  }
+lines.push(
+  defaultVoice
+    ? `Default voice (ID ${defaultVoice.id}): ${defaultVoice.description}`
+    : `Default voice (ID ${defaultSpeakerId}): configured voice.`,
+);
 
-  for (const voice of selectableVoices) {
-    const kindLabel =
-      voice.kind === "special"
-        ? "special"
-        : voice.kind === "emotion"
-          ? "emotion"
-          : "voice";
-
-    lines.push(
-      `${voice.id} [${kindLabel}] ${voice.label} — ${voice.description}`,
-    );
-  }
-
-  return lines.join("\n");
+for (const voice of selectableVoices) {
+  lines.push(`${voice.id}: ${voice.description}`);
 }
 
+return lines.join("\n");
+}
 
 function drainCompleteSentences(
   run: StreamingRun,
@@ -289,12 +294,19 @@ export default definePluginEntry({
       api.pluginConfig ?? DEFAULT_TTS_SPEAKER_CONFIG,
     );
 
-    const voices = mergeVoices(BUILTIN_VOICES, config.additionalVoices);
-    const allowedSpeakerIds = new Set(voices.map((voice) => voice.id));
+  const voiceConfig = loadVoiceConfig(
+    api.runtime.state.resolveStateDir(),
+  );
+
+  const voices = voiceConfig.voices;
+
+  const allowedSpeakerIds = new Set(
+  voices.map((voice) => voice.id),
+  );
 
     const provider = new VoicevoxProvider({
       speaker: config.defaultSpeakerId,
-      fallbackSpeaker: config.fallbackSpeakerId,
+      fallbackSpeaker: voiceConfig.fallbackSpeakerId,
       speedScale: config.speedScale,
     });
 
@@ -363,7 +375,7 @@ export default definePluginEntry({
     api.on("before_prompt_build", () => ({
       appendSystemContext: buildVoiceInstructions(
         config.defaultSpeakerId,
-        config.fallbackSpeakerId,
+        voiceConfig.fallbackSpeakerId,
         voices,
       ),
     }));
