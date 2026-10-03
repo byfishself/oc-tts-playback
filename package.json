@@ -1,5 +1,5 @@
 {
-  "name": "oc-tts-playback",
+  "name": "oc-tts-speaker",
   "version": "0.1.0",
   "description": "A TTS playback module designed for OpenClaw-related projects.",
   "type": "module",
