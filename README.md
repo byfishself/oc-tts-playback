@@ -65,6 +65,8 @@ Link the local extension to OpenClaw:
 openclaw plugins install --link . --force
 ```
 
+After installation, enable the plugin in OpenClaw if it is not already enabled. On plugin activation, TTS Speaker automatically creates its voice configuration file if it does not exist; opening the plugin settings UI is not required. See [Voice configuration file](#voice-configuration-file) below.
+
 If the extension is already linked, rebuild after source changes and reload the plugin or restart the OpenClaw Gateway as appropriate for your setup.
 
 ## Configuration
@@ -117,10 +119,21 @@ Example additional voice:
 
 Replace the example ID and details with a style that exists in your VOICEVOX Engine.
 
+### Voice configuration file
+
+When the plugin is activated, TTS Speaker creates the following file with its default voice configuration if the file does not already exist:
+
+```text
+%USERPROFILE%\\.openclaw\\TTS Speaker\\tts-speaker\\voices.json
+```
+
+The file is created during plugin initialization, not merely by linking or installing the extension. If you have just installed the plugin and the file is missing, make sure the plugin is enabled and activated. You do not need to open the settings UI to trigger file creation.
+
+An existing `voices.json` is left intact, so your custom voice definitions are not overwritten during normal initialization.
+
 ## Voice selection
 
 For the built-in style IDs and instructions for listing every style available in your local Engine, see [VOICEVOX Speakers and Style IDs](VOICEVOX_SPEAKERS.md).
-
 
 The extension recognizes this directive in assistant output:
 
