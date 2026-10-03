@@ -11,7 +11,7 @@ English | [日本語](README.ja.md)
 - Play OpenClaw assistant responses aloud through the local audio output.
 - Keep synthesis local by sending text to a local VOICEVOX Engine instance.
 - Queue playback sequentially so responses do not overlap.
-- Allow the default voice, fallback voice, speech speed, and additional voice definitions to be configured through OpenClaw.
+- Allow the default voice and speech speed to be configured through OpenClaw, while voice definitions are managed in `voices.json`.
 - Support VOICEVOX style selection through the `[[tts:speakerVoiceId=ID]]` directive when that directive is present in the assistant output.
 
 TTS Speaker uses its own playback flow. Disable OpenClaw's built-in automatic TTS if you do not want the same response to be spoken twice.
@@ -85,8 +85,7 @@ Configure the plugin under `plugins.entries.tts-speaker` in your OpenClaw config
         "config": {
           "defaultSpeakerId": 3,
           "fallbackSpeakerId": 3,
-          "speedScale": 1.0,
-          "additionalVoices": []
+          "speedScale": 1.0
         }
       }
     }
@@ -98,34 +97,38 @@ Configure the plugin under `plugins.entries.tts-speaker` in your OpenClaw config
 
 | Setting | Description |
 | --- | --- |
-| `defaultSpeakerId` | VOICEVOX style ID used for ordinary speech. The built-in default is `3`. |
-| `fallbackSpeakerId` | Final fallback style ID if synthesis with the selected/default voice fails. The built-in default is `3`. |
+| `defaultSpeakerId` | VOICEVOX style ID used for ordinary speech. |
 | `speedScale` | VOICEVOX speech speed multiplier. The built-in default is `1.0`. |
-| `additionalVoices` | Extra voice definitions made available for voice selection. The built-in list includes several Zundamon styles. |
 
-Each item in `additionalVoices` requires `id`, `key`, `label`, `description`, and `kind` (`normal`, `emotion`, or `special`). The `id` must be a valid style ID exposed by the installed VOICEVOX Engine.
-
-Example additional voice:
-
-```json
-{
-  "id": 103,
-  "key": "example-sweet",
-  "label": "Example Voice — Sweet",
-  "description": "A soft, affectionate delivery.",
-  "kind": "emotion"
-}
-```
-
-Replace the example ID and details with a style that exists in your VOICEVOX Engine.
+Voice definitions and the fallback voice are managed separately in `voices.json`. They are not configured through `openclaw.json`.
 
 ### Voice configuration file
 
-When the plugin is activated, TTS Speaker creates the following file with its default voice configuration if the file does not already exist:
+When the plugin is activated, TTS Speaker creates the following file if it does not already exist:
 
 ```text
 %USERPROFILE%\\.openclaw\\TTS Speaker\\tts-speaker\\voices.json
 ```
+
+The file contains the fallback speaker ID and the available voice definitions. For example:
+
+```json
+{
+  "fallbackSpeakerId": 3,
+  "voices": [
+    {
+      "id": 102,
+      "description": "Normal voice for ordinary conversation."
+    },
+    {
+      "id": 103,
+      "description": "Sweet, affectionate, soft, gentle emotional tone."
+    }
+  ]
+}
+```
+
+Each voice definition requires a VOICEVOX style ID (`id`) and a non-empty description. Add or remove voice definitions directly in this file.
 
 The file is created during plugin initialization, not merely by linking or installing the extension. If you have just installed the plugin and the file is missing, make sure the plugin is enabled and activated. You do not need to open the settings UI to trigger file creation.
 
