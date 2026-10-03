@@ -11,7 +11,7 @@
 - OpenClaw のアシスタント応答をローカルの音声出力から読み上げる。
 - ローカルで起動している VOICEVOX Engine にテキストを送信し、音声合成をローカルで行う。
 - 再生リクエストをキューに入れ、複数の応答が重なって再生されないようにする。
-- デフォルト音声、フォールバック音声、読み上げ速度、追加音声の定義を OpenClaw の設定から変更できるようにする。
+- デフォルト音声と読み上げ速度を OpenClaw の設定から変更し、音声定義は `voices.json` で管理する。
 - アシスタントの出力に `[[tts:speakerVoiceId=ID]]` ディレクティブが含まれる場合、VOICEVOX のスタイルを選択する。
 
 TTS Speaker は独自の再生処理を使用します。同じ応答が二重に読み上げられないようにするには、OpenClaw 標準の自動 TTS を無効にしてください。
@@ -85,8 +85,7 @@ OpenClaw の設定にある `plugins.entries.tts-speaker` で設定します。�
         "config": {
           "defaultSpeakerId": 3,
           "fallbackSpeakerId": 3,
-          "speedScale": 1.0,
-          "additionalVoices": []
+          "speedScale": 1.0
         }
       }
     }
@@ -98,34 +97,38 @@ OpenClaw の設定にある `plugins.entries.tts-speaker` で設定します。�
 
 | 項目 | 説明 |
 | --- | --- |
-| `defaultSpeakerId` | 通常の会話で使用する VOICEVOX のスタイル ID。組み込みの既定値は `3` です。 |
-| `fallbackSpeakerId` | 選択した音声／デフォルト音声での合成に失敗した場合に使用する最終フォールバック ID。既定値は `3` です。 |
+| `defaultSpeakerId` | 通常の会話で使用する VOICEVOX のスタイル ID。 |
 | `speedScale` | VOICEVOX の読み上げ速度倍率。既定値は `1.0` です。 |
-| `additionalVoices` | 音声選択に追加する音声定義。組み込みリストには、ずんだもんの複数のスタイルが含まれます。 |
 
-`additionalVoices` の各要素には `id`、`key`、`label`、`description`、`kind`（`normal`、`emotion`、`special` のいずれか）が必要です。`id` には、使用中の VOICEVOX Engine が公開している有効なスタイル ID を指定してください。
-
-追加音声の例：
-
-```json
-{
-  "id": 103,
-  "key": "example-sweet",
-  "label": "Example Voice — Sweet",
-  "description": "A soft, affectionate delivery.",
-  "kind": "emotion"
-}
-```
-
-ID と各項目は、VOICEVOX Engine に存在する実際のスタイルに合わせて変更してください。
+音声定義とフォールバック音声は、`voices.json` で別途管理します。これらは `openclaw.json` には設定しません。
 
 ### 音声設定ファイル
 
-プラグインの有効化時に、音声設定ファイルがまだ存在しない場合は、既定の音声設定を含む次のファイルが自動作成されます。
+プラグインの有効化時に、次のファイルがまだ存在しない場合は自動作成されます。
 
 ```text
 %USERPROFILE%\\.openclaw\\TTS Speaker\\tts-speaker\\voices.json
 ```
+
+このファイルには、フォールバック音声の ID と利用可能な音声定義を記述します。例えば：
+
+```json
+{
+  "fallbackSpeakerId": 3,
+  "voices": [
+    {
+      "id": 102,
+      "description": "Normal voice for ordinary conversation."
+    },
+    {
+      "id": 103,
+      "description": "Sweet, affectionate, soft, gentle emotional tone."
+    }
+  ]
+}
+```
+
+各音声定義には VOICEVOX のスタイル ID（`id`）と空ではない説明（`description`）が必要です。音声の追加・削除は、このファイルを直接編集して行います。
 
 このファイルは拡張機能をリンク／インストールしただけではなく、プラグインの初期化時に作成されます。インストール後にファイルが見つからない場合は、プラグインが有効化され、初期化されていることを確認してください。ファイル作成のために設定 UI を開く必要はありません。
 
