@@ -35,7 +35,7 @@ interface SharedTtsState {
     { text: string; timer: ReturnType<typeof setTimeout> }
   >;
   enqueueSentence?:
-    | ((text: string, speakerId: number) => void)
+    | ((text: string, speakerId: number, runId?: string) => void)
     | undefined;
 }
 
@@ -218,7 +218,8 @@ return lines.join("\n");
 function drainCompleteSentences(
   run: StreamingRun,
   allowedSpeakerIds: Set<number>,
-  enqueue: (text: string, speakerId: number) => void,
+  enqueue: (text: string, speakerId: number, runId?: string) => void,
+  runId: string,
 ): void {
   const sentencePattern = /[\s\S]*?[。！？!?]\s*/gu;
 
@@ -227,7 +228,7 @@ function drainCompleteSentences(
 
     for (const match of text.matchAll(sentencePattern)) {
       const sentence = match[0].trim();
-      if (sentence) enqueue(sentence, speakerId);
+      if (sentence) enqueue(sentence, speakerId, runId);
       consumed = (match.index ?? 0) + match[0].length;
     }
 
@@ -244,7 +245,7 @@ function drainCompleteSentences(
       // The remaining sentences before the speaker are also played back by the previous speaker.
       const remainder = enqueueText(beforeDirective, run.speakerId);
       if (remainder.trim()) {
-        enqueue(remainder.trim(), run.speakerId);
+        enqueue(remainder.trim(), run.speakerId, runId);
       }
 
       const speakerMatch = directiveMatch[1].match(
@@ -312,7 +313,11 @@ export default definePluginEntry({
 
     const speaker = new TtsSpeaker({ provider });
 
-    const enqueueSentence = (text: string, speakerId: number) => {
+    const enqueueSentence = (
+      text: string,
+      speakerId: number,
+      runId?: string,
+    ) => {
         console.log(
           `[TTS Speaker] enqueue speaker=${speakerId} text=${JSON.stringify(text)}`,
         );
@@ -325,7 +330,7 @@ export default definePluginEntry({
 
       if (!speech.text) return;
 
-      void speaker.enqueueText(speech.text, speech.speakerId).catch((error: unknown) => {
+      void speaker.enqueueText(speech.text, speech.speakerId, runId).catch((error: unknown) => {
         api.logger.error?.(
           `[TTS Speaker] playback failed: ${error instanceof Error ? error.message : String(error)}`,
         );
@@ -333,10 +338,10 @@ export default definePluginEntry({
     };
     state.enqueueSentence = enqueueSentence;
 
-    const enqueueShared = (text: string, speakerId: number) => {
+    const enqueueShared = (text: string, speakerId: number, runId?: string,) => {
       const enqueue = state.enqueueSentence;
     if (enqueue) {
-      enqueue(text, speakerId);
+      enqueue(text, speakerId, runId);
       }
     };
     
@@ -460,6 +465,7 @@ export default definePluginEntry({
           run,
           allowedSpeakerIds,
           enqueueShared,
+          runId,
         );
       },
     });
@@ -495,7 +501,7 @@ export default definePluginEntry({
                 voices,
                 directiveSpeakerId,
               );
-              if (speech.text) enqueueShared(speech.text, speech.speakerId);
+              if (speech.text) enqueueShared(speech.text, speech.speakerId, runId);
             }, VOICE_SELECTION_SETTLE_MS);
           }
         }
@@ -536,9 +542,10 @@ export default definePluginEntry({
         // Streaming already queued complete sentences. Only flush the
         // final incomplete sentence here; never replay the full response.
         if (streamRun.buffer.trim()) {
-          enqueueShared(streamRun.buffer, streamRun.speakerId);
+          enqueueShared(streamRun.buffer, streamRun.speakerId, runId!);
         }
 
+        speaker.finishRun(runId!);
         streamingRuns.delete(runId!);
         selectedSpeakersByRun.delete(runId!);
         streamedRunIds.delete(runId!);
@@ -571,7 +578,11 @@ export default definePluginEntry({
         if (runId) selectedSpeakersByRun.delete(runId);
 
         if (speech.text) {
-          enqueueShared(speech.text, speech.speakerId);
+          enqueueShared(speech.text, speech.speakerId, runId);
+        }
+
+        if (runId) {
+          speaker.finishRun(runId);
         }
       };
 
